@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Feed sanity check</title></head>
+<body>
+  <h1>Feed sanity check — not your dashboard</h1>
+  <p>This just confirms your two feed URLs actually return real data. Your actual dashboard (return vs. baselines, risk/volatility, your product-level signal, a decision log) is a separate thing you build yourself — see below.</p>
+  <pre id="out">Loading...</pre>
+<script>
+const MARKET_URL = "https://raw.githubusercontent.com/exofri/ensim-trade-center/refs/heads/main/docs/data/market.json";
+const HOLDINGS_URL = "https://raw.githubusercontent.com/exofri/ensim-trade-center/refs/heads/main/traders/[YOUR_NAME]/holdings.json";
+Promise.all([fetch(MARKET_URL).then(r => r.json()), fetch(HOLDINGS_URL).then(r => r.json())])
+  .then(([market, holdings]) => {
+    document.getElementById('out').textContent =
+      'MARKET:\n' + JSON.stringify(market, null, 2) + '\n\nHOLDINGS:\n' + JSON.stringify(holdings, null, 2);
+  })
+  .catch(err => { document.getElementById('out').textContent = 'Could not load data: ' + err; });
+</script>
+</body>
+</html>
