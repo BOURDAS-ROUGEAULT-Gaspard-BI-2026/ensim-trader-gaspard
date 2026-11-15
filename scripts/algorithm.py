@@ -20,12 +20,15 @@ def fetch_json(url):
 # en regardant les courbes de prix :
 # - A monte et descend en cycle (environ 48 ticks entre 2 sommets)
 # - C fait pareil mais plus vite (environ 24 ticks)
-# - B ne fait pas de cycle, il bouge au hasard -> on ne le trade pas
-# donc pour A et C on fait du retour a la moyenne (bandes de Bollinger) :
+# - B fait un cycle beaucoup plus long (environ 96 ticks) avec une tendance qui monte
+#   (au debut je pensais qu'il bougeait au hasard, le cycle se voit mieux en prenant du recul)
+# donc pour les 3 produits on fait du retour a la moyenne (bandes de Bollinger) :
 # prix au dessus de la moyenne -> il va redescendre -> on vend
 # prix en dessous de la moyenne -> il va remonter -> on achete
 # fenetres choisies en testant sur les ticks 0-200, verifiees sur 200-343
-fenetre = {"A": 48, "C": 12}
+# pour B la fenetre fait environ un demi-cycle (comme pour C), c'est le moins sur des 3
+# car on n'a vu que 3-4 cycles de B
+fenetre = {"A": 48, "B": 50, "C": 12}
 seuil = 0.5   # si le prix est trop proche de la moyenne on ne fait rien (bruit)
 
 

@@ -1,7 +1,7 @@
 [
  {
   "tick": 343,
-  "date": "2026-11-15T14:08:05Z",
+  "date": "2026-11-15T14:17:58Z",
   "prix": {
    "A": 5.395,
    "B": 10.5495,
@@ -9,17 +9,17 @@
   },
   "z": {
    "A": 0.75,
-   "B": null,
+   "B": -0.78,
    "C": -1.358
   },
   "decision": {
    "A": -0.75,
-   "B": 0.0,
+   "B": 0.78,
    "C": 1.0
   },
   "raison": [
    "A : z=+0.75 prix haut, on vend 0.75",
-   "B : pas de cycle, on ne trade pas",
+   "B : z=-0.78 prix bas, on achete 0.78",
    "C : z=-1.36 prix bas, on achete 1.0"
   ],
   "argent": 1000.0,
