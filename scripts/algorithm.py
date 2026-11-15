@@ -5,6 +5,11 @@ import requests
 MARKET_URL = "https://raw.githubusercontent.com/exofri/ensim-trade-center/refs/heads/main/docs/data/market.json"
 HOLDINGS_URL = "https://raw.githubusercontent.com/exofri/ensim-trade-center/refs/heads/main/traders/gaspard/holdings.json"
 
+# classement du prof (valeur totale de chaque trader, dont les 3 baselines)
+LEADERBOARD_URL = "https://raw.githubusercontent.com/exofri/ensim-trade-center/refs/heads/main/docs/data/leaderboard.json"
+# notre journal, lu par le dashboard (docs/index.html)
+JOURNAL = "docs/data/journal.json"
+
 MIN_MONEY_RESERVE = 50 # on garde toujours au moins 50 d'argent, on n'achete pas en dessous
 
 def fetch_json(url):
@@ -24,22 +29,25 @@ fenetre = {"A": 48, "C": 12}
 seuil = 0.5   # si le prix est trop proche de la moyenne on ne fait rien (bruit)
 
 
-def compute_signal(prices, product=None):
+def calcul_z(prices, product):
+    # z = de combien d'ecarts-types le prix actuel est loin de la moyenne
+    # renvoie None si on ne peut pas le calculer (B, ou pas assez d'historique)
     if product not in fenetre:
-        return 0.0  # B : on ne trade pas
+        return None
     n = fenetre[product]
     if len(prices) < n:
-        return 0.0  # pas assez d'historique
-
+        return None
     derniers = prices[-n:]
     moyenne = sum(derniers) / n
     ecart_type = (sum((x - moyenne) ** 2 for x in derniers) / n) ** 0.5
     if ecart_type == 0:
-        return 0.0
+        return None
+    return (prices[-1] - moyenne) / ecart_type
 
-    # z = de combien d'ecarts-types le prix actuel est loin de la moyenne
-    z = (prices[-1] - moyenne) / ecart_type
-    if abs(z) < seuil:
+
+def compute_signal(prices, product=None):
+    z = calcul_z(prices, product)
+    if z is None or abs(z) < seuil:
         return 0.0
 
     # on fait l'inverse de z, et on reste entre -1 et 1
@@ -77,6 +85,73 @@ def main():
     with open("decision.json", "w") as f:
         json.dump(decision, f, indent=2)
     print(f"Wrote decision.json: {decision}")
+
+    # on note tout dans le journal pour le dashboard (si ca plante, pas grave,
+    # la decision est deja ecrite)
+    try:
+        ajouter_au_journal(market, holdings, decision)
+    except Exception as e:
+        print("journal pas mis a jour :", e)
+
+
+def raison(p, z, d):
+    # petite phrase pour expliquer la decision dans le journal
+    if p not in fenetre:
+        return f"{p} : pas de cycle, on ne trade pas"
+    if z is None:
+        return f"{p} : pas assez d'historique"
+    if d == 0 and abs(z) < seuil:
+        return f"{p} : z={z:+.2f} proche de la moyenne, on attend"
+    if d == 0:
+        return f"{p} : z={z:+.2f} mais plus d'argent pour acheter"
+    if d > 0:
+        return f"{p} : z={z:+.2f} prix bas, on achete {d}"
+    return f"{p} : z={z:+.2f} prix haut, on vend {-d}"
+
+
+def ajouter_au_journal(market, holdings, decision):
+    history = market["history"]
+    tick = history[-1]["t"]
+    prix = {p: history[-1][p] for p in market["products"]}
+
+    try:
+        with open(JOURNAL) as f:
+            journal = json.load(f)
+    except FileNotFoundError:
+        journal = []
+
+    # le marche avance toutes les heures mais le script tourne toutes les 30 min,
+    # donc on n'ajoute une ligne que quand il y a un nouveau tick
+    if journal and journal[-1]["tick"] == tick:
+        print("journal : meme tick, rien a ajouter")
+        return
+
+    # valeur des autres traders (dont les 3 baselines) donnee par le classement du prof
+    classement = fetch_json(LEADERBOARD_URL)["leaderboard"]
+    autres = {row["id"]: row["total_value"] for row in classement}
+
+    valeur = holdings["money"] + sum(holdings["products"][p] * prix[p] for p in prix)
+    z = {}
+    for p in market["products"]:
+        prices = [row[p] for row in history]
+        zp = calcul_z(prices, p)
+        z[p] = None if zp is None else round(zp, 3)
+
+    journal.append({
+        "tick": tick,
+        "date": decision["updated_at"],
+        "prix": prix,
+        "z": z,
+        "decision": {p: decision[p] for p in market["products"]},
+        "raison": [raison(p, z[p], decision[p]) for p in market["products"]],
+        "argent": round(holdings["money"], 2),
+        "produits": {p: round(q, 2) for p, q in holdings["products"].items()},
+        "valeur": round(valeur, 2),
+        "baselines": {b: autres.get(b) for b in ["random_trader", "random_buyer", "random_seller"]},
+    })
+    with open(JOURNAL, "w") as f:
+        json.dump(journal, f, indent=1)
+    print(f"journal : tick {tick} ajoute ({len(journal)} lignes)")
 
 if __name__ == "__main__":
     main()

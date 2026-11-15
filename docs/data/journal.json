@@ -1,0 +1,38 @@
+[
+ {
+  "tick": 343,
+  "date": "2026-11-15T14:08:05Z",
+  "prix": {
+   "A": 5.395,
+   "B": 10.5495,
+   "C": 1.0004
+  },
+  "z": {
+   "A": 0.75,
+   "B": null,
+   "C": -1.358
+  },
+  "decision": {
+   "A": -0.75,
+   "B": 0.0,
+   "C": 1.0
+  },
+  "raison": [
+   "A : z=+0.75 prix haut, on vend 0.75",
+   "B : pas de cycle, on ne trade pas",
+   "C : z=-1.36 prix bas, on achete 1.0"
+  ],
+  "argent": 1000.0,
+  "produits": {
+   "A": 1000.0,
+   "B": 1000.0,
+   "C": 1000.0
+  },
+  "valeur": 17944.9,
+  "baselines": {
+   "random_trader": 19158.59,
+   "random_buyer": 17863.22,
+   "random_seller": 18005.8
+  }
+ }
+]

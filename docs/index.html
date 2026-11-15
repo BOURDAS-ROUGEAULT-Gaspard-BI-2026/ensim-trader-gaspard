@@ -1,19 +1,512 @@
 <!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><title>Feed sanity check</title></head>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard trader Gaspard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  /* couleurs en variables pour avoir un mode clair et un mode sombre */
+  :root {
+    --fond: #f4f4f2;
+    --carte: #fcfcfb;
+    --bord: #e2e1dc;
+    --texte: #0b0b0b;
+    --texte-2: #52514e;
+    --texte-3: #8a8983;
+    --grille: #ecebe7;
+    --moi: #2a78d6;            /* moi = bleu */
+    --random-trader: #eb6834;  /* orange */
+    --random-buyer: #1baf7a;   /* vert d'eau */
+    --random-seller: #eda100;  /* jaune */
+    --autres: #b5b4ae;         /* les autres eleves en gris */
+    --bon: #008300;
+    --mauvais: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fond: #111110; --carte: #1a1a19; --bord: #2e2e2c;
+      --texte: #f0efec; --texte-2: #c3c2b7; --texte-3: #8d8c85; --grille: #2a2a28;
+      --moi: #3987e5; --random-trader: #d95926; --random-buyer: #199e70; --random-seller: #c98500;
+      --autres: #5c5b56; --bon: #3fb93f; --mauvais: #e66767;
+    }
+  }
+  :root[data-theme="dark"] {
+    --fond: #111110; --carte: #1a1a19; --bord: #2e2e2c;
+    --texte: #f0efec; --texte-2: #c3c2b7; --texte-3: #8d8c85; --grille: #2a2a28;
+    --moi: #3987e5; --random-trader: #d95926; --random-buyer: #199e70; --random-seller: #c98500;
+    --autres: #5c5b56; --bon: #3fb93f; --mauvais: #e66767;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--fond); color: var(--texte);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.45;
+  }
+  main { max-width: 1150px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h2 { font-size: 1.15rem; margin: 36px 0 4px; }
+  h3 { font-size: 0.95rem; margin: 0 0 8px; }
+  .sous-titre, .note { color: var(--texte-2); margin: 0 0 14px; font-size: 0.92rem; }
+  .note { font-size: 0.85rem; color: var(--texte-3); }
+
+  .tuiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .tuile, .carte { background: var(--carte); border: 1px solid var(--bord); border-radius: 10px; padding: 14px 16px; }
+  .tuile .label { color: var(--texte-2); font-size: 0.8rem; }
+  .tuile .valeur { font-size: 1.55rem; font-weight: 650; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .tuile .detail { color: var(--texte-3); font-size: 0.8rem; }
+  .pos { color: var(--bon); } .neg { color: var(--mauvais); }
+
+  .grille2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grille3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  @media (max-width: 820px) { .grille2, .grille3 { grid-template-columns: 1fr; } }
+  .graph { position: relative; height: 260px; }
+  .graph.petit { height: 150px; }
+  .vide { color: var(--texte-3); font-size: 0.85rem; margin-top: 6px; }
+
+  .legende { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.82rem; color: var(--texte-2); margin-bottom: 8px; }
+  .legende span::before { content: ""; display: inline-block; width: 12px; height: 3px; border-radius: 2px;
+    background: var(--c); vertical-align: middle; margin-right: 6px; }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--bord); white-space: nowrap; }
+  td.raison { white-space: normal; min-width: 280px; color: var(--texte-2); }
+  th { color: var(--texte-2); font-weight: 600; }
+  td.num { font-variant-numeric: tabular-nums; text-align: right; }
+  #erreur { color: var(--mauvais); }
+  a { color: var(--moi); }
+</style>
+</head>
 <body>
-  <h1>Feed sanity check — not your dashboard</h1>
-  <p>This just confirms your two feed URLs actually return real data. Your actual dashboard (return vs. baselines, risk/volatility, your product-level signal, a decision log) is a separate thing you build yourself — see below.</p>
-  <pre id="out">Loading...</pre>
+<main>
+  <h1>Dashboard trader : Gaspard</h1>
+  <p class="sous-titre" id="maj">Chargement des données...</p>
+  <p id="erreur"></p>
+
+  <!-- 1. RESUME -->
+  <div class="tuiles">
+    <div class="tuile"><div class="label">Valeur totale</div><div class="valeur" id="t-valeur">—</div><div class="detail" id="t-valeur-d"></div></div>
+    <div class="tuile"><div class="label">Classement</div><div class="valeur" id="t-rang">—</div><div class="detail" id="t-rang-d"></div></div>
+    <div class="tuile"><div class="label">Écart avec la meilleure baseline</div><div class="valeur" id="t-ecart">—</div><div class="detail" id="t-ecart-d"></div></div>
+    <div class="tuile"><div class="label">Drawdown actuel</div><div class="valeur" id="t-dd">—</div><div class="detail">baisse depuis mon plus haut</div></div>
+    <div class="tuile"><div class="label">Argent disponible</div><div class="valeur" id="t-argent">—</div><div class="detail">réserve minimum : 50</div></div>
+  </div>
+
+  <!-- 2. PERFORMANCE -->
+  <h2>Performance comparée aux baselines</h2>
+  <p class="sous-titre">Est-ce que je fais mieux que les traders au hasard ? C'est la première chose que je regarde à chaque tick.</p>
+  <div class="grille2">
+    <div class="carte">
+      <h3>Classement actuel (valeur totale)</h3>
+      <div class="graph"><canvas id="g-classement"></canvas></div>
+    </div>
+    <div class="carte">
+      <h3>Valeur totale au fil des ticks</h3>
+      <div class="legende">
+        <span style="--c: var(--moi)">Moi</span>
+        <span style="--c: var(--random-trader)">random trader</span>
+        <span style="--c: var(--random-buyer)">random buyer</span>
+        <span style="--c: var(--random-seller)">random seller</span>
+      </div>
+      <div class="graph"><canvas id="g-valeur"></canvas></div>
+      <p class="vide" id="v-valeur"></p>
+    </div>
+  </div>
+
+  <!-- 3. RISQUE -->
+  <h2>Risque</h2>
+  <p class="sous-titre">Gagner plus ne suffit pas, il faut aussi voir si la stratégie fait de grosses chutes.</p>
+  <div class="grille2">
+    <div class="carte">
+      <h3>Drawdown (% sous le plus haut atteint)</h3>
+      <div class="legende">
+        <span style="--c: var(--moi)">Moi</span>
+        <span style="--c: var(--random-trader)">random trader</span>
+        <span style="--c: var(--random-buyer)">random buyer</span>
+        <span style="--c: var(--random-seller)">random seller</span>
+      </div>
+      <div class="graph"><canvas id="g-drawdown"></canvas></div>
+      <p class="vide" id="v-drawdown"></p>
+    </div>
+    <div class="carte">
+      <h3>Simulation de ma stratégie sur tout l'historique</h3>
+      <div class="legende">
+        <span style="--c: var(--moi)">Ma stratégie (simulée)</span>
+        <span style="--c: var(--texte-3)">Ne rien faire</span>
+      </div>
+      <div class="graph"><canvas id="g-simu"></canvas></div>
+      <p class="note" id="n-simu"></p>
+    </div>
+  </div>
+  <div class="tuiles" style="margin-top:12px">
+    <div class="tuile"><div class="label">Drawdown max (réel)</div><div class="valeur" id="t-ddmax">—</div><div class="detail">depuis le début du journal</div></div>
+    <div class="tuile"><div class="label">Volatilité par tick (réelle)</div><div class="valeur" id="t-vol">—</div><div class="detail">écart-type des variations</div></div>
+    <div class="tuile"><div class="label">Drawdown max (simulation)</div><div class="valeur" id="t-ddsimu">—</div><div class="detail" id="t-ddsimu-d"></div></div>
+    <div class="tuile"><div class="label">Rendement (simulation)</div><div class="valeur" id="t-rsimu">—</div><div class="detail" id="t-rsimu-d"></div></div>
+  </div>
+
+  <!-- 4. SIGNAL -->
+  <h2>Mon signal par produit</h2>
+  <p class="sous-titre">
+    Pour A et C : z = (prix − moyenne) / écart-type. Si z &gt; 0,5 le prix est haut, je vends ; si z &lt; −0,5 il est bas, j'achète.
+    Fenêtre de 48 ticks pour A, 12 pour C. B n'est pas tradé (pas de cycle).
+  </p>
+  <div class="grille3">
+    <div class="carte">
+      <h3 id="h-A">Produit A</h3>
+      <div class="graph"><canvas id="g-prix-A"></canvas></div>
+      <div class="graph petit"><canvas id="g-z-A"></canvas></div>
+    </div>
+    <div class="carte">
+      <h3 id="h-B">Produit B</h3>
+      <div class="graph"><canvas id="g-prix-B"></canvas></div>
+      <p class="note">Pas de z : l'autocorrélation des variations de B est proche de 0, il n'y a pas de cycle à exploiter.</p>
+    </div>
+    <div class="carte">
+      <h3 id="h-C">Produit C</h3>
+      <div class="graph"><canvas id="g-prix-C"></canvas></div>
+      <div class="graph petit"><canvas id="g-z-C"></canvas></div>
+    </div>
+  </div>
+  <p class="note">Graphiques de prix : trait plein = prix, pointillés = moyenne mobile, traits fins = zone « on ne fait rien » (moyenne ± 0,5 écart-type). 150 derniers ticks.</p>
+
+  <!-- 5. JOURNAL -->
+  <h2>Journal des décisions</h2>
+  <p class="sous-titre">Une ligne par tick, écrite automatiquement par <code>scripts/algorithm.py</code>.</p>
+  <div class="carte table-wrap">
+    <table>
+      <thead><tr><th>Tick</th><th>Date</th><th>A</th><th>B</th><th>C</th><th>Valeur</th><th>Raison</th></tr></thead>
+      <tbody id="journal"></tbody>
+    </table>
+    <p class="vide" id="v-journal"></p>
+  </div>
+
+  <p class="note" style="margin-top:24px">Sources : flux du marché, mon portefeuille et le classement publiés par le prof, et mon journal <code>docs/data/journal.json</code>. <a href="check.html">Test des flux</a></p>
+</main>
+
 <script>
+// les liens des donnees
 const MARKET_URL = "https://raw.githubusercontent.com/exofri/ensim-trade-center/refs/heads/main/docs/data/market.json";
 const HOLDINGS_URL = "https://raw.githubusercontent.com/exofri/ensim-trade-center/refs/heads/main/traders/gaspard/holdings.json";
-Promise.all([fetch(MARKET_URL).then(r => r.json()), fetch(HOLDINGS_URL).then(r => r.json())])
-  .then(([market, holdings]) => {
-    document.getElementById('out').textContent =
-      'MARKET:\n' + JSON.stringify(market, null, 2) + '\n\nHOLDINGS:\n' + JSON.stringify(holdings, null, 2);
-  })
-  .catch(err => { document.getElementById('out').textContent = 'Could not load data: ' + err; });
+const LEADERBOARD_URL = "https://raw.githubusercontent.com/exofri/ensim-trade-center/refs/heads/main/docs/data/leaderboard.json";
+const MON_REPO = "https://raw.githubusercontent.com/BOURDAS-ROUGEAULT-Gaspard-BI-2026/ensim-trader-gaspard/main/";
+const JOURNAL_URL = MON_REPO + "docs/data/journal.json";
+const DECISION_URL = MON_REPO + "decision.json";
+
+const MOI = "gaspard";
+const BASELINES = ["random_trader", "random_buyer", "random_seller"];
+// memes parametres que dans algorithm.py
+const FENETRE = { A: 48, C: 12 };
+const SEUIL = 0.5;
+const NB_TICKS_AFFICHES = 150;
+
+// ---------- petites fonctions utiles ----------
+function couleur(nom) {
+  return getComputedStyle(document.documentElement).getPropertyValue("--" + nom).trim();
+}
+function couleurTrader(id) {
+  if (id === MOI) return couleur("moi");
+  if (BASELINES.includes(id)) return couleur(id.replace("_", "-"));
+  return couleur("autres");
+}
+function argent(x) {
+  return x.toLocaleString("fr-FR", { maximumFractionDigits: 0 });
+}
+function pct(x, signe = true) {
+  return (signe && x > 0 ? "+" : "") + (100 * x).toFixed(1).replace(".", ",") + " %";
+}
+function ecrire(id, texte, classe) {
+  const el = document.getElementById(id);
+  el.textContent = texte;
+  if (classe) el.className = el.className + " " + classe;
+}
+async function charger(url) {
+  const r = await fetch(url, { cache: "no-store" });
+  if (!r.ok) throw new Error(url + " -> " + r.status);
+  return r.json();
+}
+
+// moyenne, ecart-type et z pour chaque tick (null tant qu'il n'y a pas assez de prix)
+function calculZ(prix, n) {
+  const moy = [], haut = [], bas = [], z = [];
+  for (let i = 0; i < prix.length; i++) {
+    if (i + 1 < n) { moy.push(null); haut.push(null); bas.push(null); z.push(null); continue; }
+    const derniers = prix.slice(i + 1 - n, i + 1);
+    const m = derniers.reduce((a, b) => a + b, 0) / n;
+    const sd = Math.sqrt(derniers.reduce((a, b) => a + (b - m) ** 2, 0) / n);
+    moy.push(m); haut.push(m + SEUIL * sd); bas.push(m - SEUIL * sd);
+    z.push(sd === 0 ? null : (prix[i] - m) / sd);
+  }
+  return { moy, haut, bas, z };
+}
+
+// meme regle que compute_signal dans algorithm.py
+function signal(z) {
+  if (z === null || Math.abs(z) < SEUIL) return 0;
+  return Math.max(-1, Math.min(1, -z));
+}
+
+// drawdown : de combien on est en dessous du plus haut atteint jusque la
+function drawdown(valeurs) {
+  let max = -Infinity;
+  return valeurs.map(v => { max = Math.max(max, v); return (v - max) / max; });
+}
+function volatilite(valeurs) {
+  const r = [];
+  for (let i = 1; i < valeurs.length; i++) r.push(valeurs[i] / valeurs[i - 1] - 1);
+  if (r.length < 2) return null;
+  const m = r.reduce((a, b) => a + b, 0) / r.length;
+  return Math.sqrt(r.reduce((a, b) => a + (b - m) ** 2, 0) / r.length);
+}
+
+// simulation (backtest) : on rejoue ma regle sur tout l'historique
+// depart = 1000 d'argent + 1000 de chaque produit, ordre execute au prix du tick suivant
+function simuler(history, produits, avecStrategie) {
+  let money = 1000;
+  const unites = {}; produits.forEach(p => unites[p] = 1000);
+  const prix = {}; produits.forEach(p => prix[p] = history.map(r => r[p]));
+  const z = {}; produits.forEach(p => { if (FENETRE[p]) z[p] = calculZ(prix[p], FENETRE[p]).z; });
+  const valeurs = [];
+  for (let t = 0; t < history.length; t++) {
+    if (avecStrategie && t + 1 < history.length) {
+      for (const p of produits) {
+        if (!FENETRE[p]) continue;
+        let s = signal(z[p][t]);
+        // garde-fou budget comme apply_budget_guard
+        if (s > 0) {
+          if (money <= 50) s = 0;
+          else s = Math.min(s, (money - 50) / prix[p][t] / 100);
+        }
+        let q = 100 * s;
+        const px = prix[p][t + 1];
+        q = q > 0 ? Math.min(q, Math.max(money, 0) / px) : -Math.min(-q, unites[p]);
+        money -= q * px;
+        unites[p] += q;
+      }
+    }
+    valeurs.push(money + produits.reduce((a, p) => a + unites[p] * prix[p][t], 0));
+  }
+  return valeurs;
+}
+
+// ---------- reglages communs des graphiques ----------
+function reglerChartJs() {
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+  Chart.defaults.font.size = 11;
+  Chart.defaults.color = couleur("texte-2");
+  Chart.defaults.borderColor = couleur("grille");
+  Chart.defaults.animation = false;
+  Chart.defaults.maintainAspectRatio = false;
+  Chart.defaults.plugins.legend.display = false;   // legende faite en HTML au dessus
+  Chart.defaults.interaction = { mode: "index", intersect: false };  // tooltip sur toute la verticale
+  Chart.defaults.elements.line.borderWidth = 2;
+  Chart.defaults.elements.point.radius = 0;
+  Chart.defaults.elements.point.hoverRadius = 5;
+  Chart.defaults.elements.point.hitRadius = 8;
+  Chart.defaults.plugins.tooltip.backgroundColor = couleur("carte");
+  Chart.defaults.plugins.tooltip.titleColor = couleur("texte");
+  Chart.defaults.plugins.tooltip.bodyColor = couleur("texte-2");
+  Chart.defaults.plugins.tooltip.borderColor = couleur("bord");
+  Chart.defaults.plugins.tooltip.borderWidth = 1;
+}
+function serie(label, data, c, extra = {}) {
+  return Object.assign({ label, data, borderColor: c, backgroundColor: c, tension: 0.2, spanGaps: true }, extra);
+}
+function graphLigne(id, labels, datasets, optionsY = {}) {
+  return new Chart(document.getElementById(id), {
+    type: "line",
+    data: { labels, datasets },
+    options: {
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 6, maxRotation: 0 } },
+        y: Object.assign({ ticks: { maxTicksLimit: 5 } }, optionsY),
+      },
+    },
+  });
+}
+
+// ---------- dessin de chaque partie ----------
+function dessinerResume(market, holdings, classement, journal) {
+  const dernier = market.history[market.history.length - 1];
+  const valeur = holdings.money + market.products.reduce((a, p) => a + holdings.products[p] * dernier[p], 0);
+  ecrire("t-valeur", argent(valeur));
+  ecrire("t-valeur-d", "départ : 1000 + 1000 de chaque produit");
+
+  const tri = [...classement.leaderboard].sort((a, b) => b.total_value - a.total_value);
+  const rang = tri.findIndex(r => r.id === MOI) + 1;
+  ecrire("t-rang", rang + " / " + tri.length);
+  ecrire("t-rang-d", "classement du prof (" + new Date(classement.generated_at).toLocaleString("fr-FR") + ")");
+
+  const baselines = tri.filter(r => r.baseline);
+  const meilleure = baselines[0];
+  const ecart = valeur - meilleure.total_value;
+  ecrire("t-ecart", (ecart > 0 ? "+" : "") + argent(ecart), ecart >= 0 ? "pos" : "neg");
+  ecrire("t-ecart-d", "contre " + meilleure.id + " (" + argent(meilleure.total_value) + ")");
+  ecrire("t-argent", argent(holdings.money));
+
+  if (journal.length > 0) {
+    const dd = drawdown(journal.map(j => j.valeur));
+    const ddActuel = dd[dd.length - 1];
+    ecrire("t-dd", pct(ddActuel, false), ddActuel < -0.05 ? "neg" : "");
+  }
+}
+
+function dessinerClassement(classement) {
+  const tri = [...classement.leaderboard].sort((a, b) => b.total_value - a.total_value);
+  new Chart(document.getElementById("g-classement"), {
+    type: "bar",
+    data: {
+      labels: tri.map(r => r.id === MOI ? "Moi" : r.name),
+      datasets: [{
+        data: tri.map(r => r.total_value),
+        backgroundColor: tri.map(r => couleurTrader(r.id)),
+        borderRadius: 4, borderSkipped: "start", barThickness: 16,
+      }],
+    },
+    options: {
+      indexAxis: "y",
+      interaction: { mode: "nearest", intersect: true },
+      plugins: { tooltip: { callbacks: { label: c => argent(c.raw) + (tri[c.dataIndex].baseline ? " (baseline)" : "") } } },
+      scales: {
+        x: { beginAtZero: false, ticks: { maxTicksLimit: 5 } },
+        y: { grid: { display: false } },
+      },
+    },
+  });
+}
+
+function dessinerPerformanceEtRisque(journal) {
+  const labels = journal.map(j => "tick " + j.tick);
+  const moi = journal.map(j => j.valeur);
+  const series = [serie("Moi", moi, couleur("moi"))];
+  const seriesDD = [serie("Moi", drawdown(moi).map(x => 100 * x), couleur("moi"))];
+  for (const b of BASELINES) {
+    const v = journal.map(j => j.baselines[b]);
+    series.push(serie(b.replace("_", " "), v, couleurTrader(b)));
+    seriesDD.push(serie(b.replace("_", " "), drawdown(v).map(x => 100 * x), couleurTrader(b)));
+  }
+  // avec un seul point on affiche quand meme les points sinon on ne voit rien
+  if (journal.length < 2) series.concat(seriesDD).forEach(s => s.pointRadius = 4);
+  graphLigne("g-valeur", labels, series);
+  graphLigne("g-drawdown", labels, seriesDD, { max: 0, ticks: { callback: v => v + " %", maxTicksLimit: 5 } });
+
+  if (journal.length < 2) {
+    const msg = "Le journal se remplit automatiquement à chaque tick du marché (" + journal.length + " point pour l'instant).";
+    ecrire("v-valeur", msg); ecrire("v-drawdown", msg);
+  }
+  if (journal.length > 0) {
+    const dd = drawdown(moi);
+    ecrire("t-ddmax", pct(Math.min(...dd), false));
+    const vol = volatilite(moi);
+    ecrire("t-vol", vol === null ? "—" : pct(vol, false));
+  }
+}
+
+function dessinerSimulation(market) {
+  const algo = simuler(market.history, market.products, true);
+  const rien = simuler(market.history, market.products, false);
+  const labels = market.history.map(r => "tick " + r.t);
+  graphLigne("g-simu", labels, [
+    serie("Ma stratégie (simulée)", algo, couleur("moi")),
+    serie("Ne rien faire", rien, couleur("texte-3"), { borderDash: [5, 4] }),
+  ], { ticks: { callback: v => argent(v), maxTicksLimit: 5 } });
+
+  const r = v => v[v.length - 1] / v[0] - 1;
+  ecrire("t-rsimu", pct(r(algo)), r(algo) >= 0 ? "pos" : "neg");
+  ecrire("t-rsimu-d", "ne rien faire : " + pct(r(rien)));
+  ecrire("t-ddsimu", pct(Math.min(...drawdown(algo)), false));
+  ecrire("t-ddsimu-d", "ne rien faire : " + pct(Math.min(...drawdown(rien)), false));
+  ecrire("n-simu", "Backtest sur " + market.history.length + " ticks, ordre exécuté au prix du tick suivant, sans frais. "
+    + "Ce n'est pas mon vrai résultat, ça sert à vérifier que la règle tient sur l'historique.");
+}
+
+function dessinerSignaux(market, decision) {
+  const debut = Math.max(0, market.history.length - NB_TICKS_AFFICHES);
+  const labels = market.history.slice(debut).map(r => "tick " + r.t);
+  for (const p of market.products) {
+    const prix = market.history.map(r => r[p]);
+    const datasets = [serie("Prix", prix.slice(debut), couleur("moi"))];
+    let titre = "Produit " + p + " : prix " + prix[prix.length - 1].toFixed(2);
+
+    if (FENETRE[p]) {
+      const c = calculZ(prix, FENETRE[p]);
+      const fin = arr => arr.slice(debut);
+      datasets.push(serie("Moyenne", fin(c.moy), couleur("texte-2"), { borderDash: [5, 4], borderWidth: 1.5 }));
+      datasets.push(serie("Moyenne + 0,5 σ", fin(c.haut), couleur("texte-3"), { borderWidth: 1 }));
+      datasets.push(serie("Moyenne − 0,5 σ", fin(c.bas), couleur("texte-3"), { borderWidth: 1 }));
+
+      const zs = fin(c.z);
+      const ligne = v => zs.map(() => v);
+      graphLigne("g-z-" + p, labels, [
+        serie("z", zs, couleur("moi")),
+        serie("seuil vente", ligne(SEUIL), couleur("texte-3"), { borderDash: [4, 4], borderWidth: 1, pointHoverRadius: 0 }),
+        serie("seuil achat", ligne(-SEUIL), couleur("texte-3"), { borderDash: [4, 4], borderWidth: 1, pointHoverRadius: 0 }),
+      ], { ticks: { maxTicksLimit: 4 } });
+
+      const zNow = c.z[c.z.length - 1];
+      const d = decision ? decision[p] : signal(zNow);
+      const action = d > 0 ? "achat " + d : d < 0 ? "vente " + (-d) : "on attend";
+      titre += " · z = " + zNow.toFixed(2) + " · " + action;
+    } else {
+      titre += " · non tradé";
+    }
+    document.getElementById("h-" + p).textContent = titre;
+    graphLigne("g-prix-" + p, labels, datasets, { ticks: { callback: v => v.toFixed(1), maxTicksLimit: 5 } });
+  }
+}
+
+function dessinerJournal(journal) {
+  const tbody = document.getElementById("journal");
+  if (journal.length === 0) {
+    ecrire("v-journal", "Pas encore de ligne : le journal se remplit à chaque tick.");
+    return;
+  }
+  const fmt = d => d > 0 ? "+" + d : String(d);
+  for (const j of [...journal].reverse()) {
+    const tr = document.createElement("tr");
+    const cellules = [
+      j.tick, new Date(j.date).toLocaleString("fr-FR"),
+      fmt(j.decision.A), fmt(j.decision.B), fmt(j.decision.C),
+      argent(j.valeur), j.raison.join(" · "),
+    ];
+    cellules.forEach((c, i) => {
+      const td = document.createElement("td");
+      td.textContent = c;
+      if ([0, 2, 3, 4, 5].includes(i)) td.className = "num";
+      if (i === 6) td.className = "raison";
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  }
+}
+
+// ---------- programme principal ----------
+async function main() {
+  reglerChartJs();
+  try {
+    const [market, holdings, classement] = await Promise.all([
+      charger(MARKET_URL), charger(HOLDINGS_URL), charger(LEADERBOARD_URL),
+    ]);
+    // le journal et la decision viennent de mon repo : s'ils ne sont pas encore la, on continue sans
+    const journal = await charger(JOURNAL_URL).catch(() => []);
+    const decision = await charger(DECISION_URL).catch(() => null);
+
+    ecrire("maj", "Marché au tick " + market.history[market.history.length - 1].t
+      + " (" + new Date(market.generated_at).toLocaleString("fr-FR") + ")"
+      + (decision ? " · ma dernière décision : " + new Date(decision.updated_at).toLocaleString("fr-FR") : ""));
+
+    dessinerResume(market, holdings, classement, journal);
+    dessinerClassement(classement);
+    dessinerPerformanceEtRisque(journal);
+    dessinerSimulation(market);
+    dessinerSignaux(market, decision);
+    dessinerJournal(journal);
+  } catch (e) {
+    ecrire("erreur", "Impossible de charger les données : " + e.message);
+  }
+}
+main();
 </script>
 </body>
 </html>
