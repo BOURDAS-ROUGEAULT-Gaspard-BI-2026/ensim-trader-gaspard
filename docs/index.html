@@ -7,7 +7,7 @@
   <pre id="out">Loading...</pre>
 <script>
 const MARKET_URL = "https://raw.githubusercontent.com/exofri/ensim-trade-center/refs/heads/main/docs/data/market.json";
-const HOLDINGS_URL = "https://raw.githubusercontent.com/exofri/ensim-trade-center/refs/heads/main/traders/[YOUR_NAME]/holdings.json";
+const HOLDINGS_URL = "https://raw.githubusercontent.com/exofri/ensim-trade-center/refs/heads/main/traders/gaspard/holdings.json";
 Promise.all([fetch(MARKET_URL).then(r => r.json()), fetch(HOLDINGS_URL).then(r => r.json())])
   .then(([market, holdings]) => {
     document.getElementById('out').textContent =
