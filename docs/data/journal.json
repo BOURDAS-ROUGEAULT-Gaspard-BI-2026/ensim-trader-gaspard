@@ -142,5 +142,41 @@
    "random_buyer": 18090.84,
    "random_seller": 18005.8
   }
+ },
+ {
+  "tick": 347,
+  "date": "2026-11-16T08:15:13Z",
+  "prix": {
+   "A": 5.645,
+   "B": 10.6042,
+   "C": 1.0907
+  },
+  "z": {
+   "A": 1.239,
+   "B": -0.564,
+   "C": -0.271
+  },
+  "decision": {
+   "A": -1.0,
+   "B": 0.457,
+   "C": 0.0
+  },
+  "raison": [
+   "A : z=+1.24 prix haut, on vend 1.0",
+   "B : z=-0.56 prix bas, on achete 0.457",
+   "C : z=-0.27 proche de la moyenne, on attend"
+  ],
+  "argent": 534.79,
+  "produits": {
+   "A": 628.3,
+   "B": 1205.4,
+   "C": 1366.5
+  },
+  "valeur": 18354.29,
+  "baselines": {
+   "random_trader": 19651.82,
+   "random_buyer": 18295.82,
+   "random_seller": 18005.8
+  }
  }
 ]
