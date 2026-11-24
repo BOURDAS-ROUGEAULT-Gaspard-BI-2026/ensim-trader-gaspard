@@ -318,6 +318,21 @@ function drawdown(valeurs) {
   // null = valeur inconnue (baselines des ticks simules) : on la laisse vide
   return valeurs.map(v => { if (v == null) return null; max = Math.max(max, v); return (v - max) / max; });
 }
+// valeurs manquantes (null, ex. baselines des ticks simules) : droite (fonction affine)
+// entre le dernier point connu avant le trou et le premier apres, selon le numero de tick
+// les trous au tout debut ou a la toute fin restent null (pas de point pour s'appuyer)
+function interpoler(ticks, valeurs) {
+  const res = [...valeurs];
+  for (let i = 0; i < res.length; i++) {
+    if (res[i] != null) continue;
+    let a = i - 1; while (a >= 0 && valeurs[a] == null) a--;
+    let b = i + 1; while (b < res.length && valeurs[b] == null) b++;
+    if (a < 0 || b >= res.length) continue;
+    const k = (ticks[i] - ticks[a]) / (ticks[b] - ticks[a]);
+    res[i] = valeurs[a] + k * (valeurs[b] - valeurs[a]);
+  }
+  return res;
+}
 function volatilite(valeurs) {
   const r = [];
   for (let i = 1; i < valeurs.length; i++) r.push(valeurs[i] / valeurs[i - 1] - 1);
@@ -507,7 +522,7 @@ function dessinerPerformanceEtRisque(journal) {
   const series = [serie("Moi", moi, couleur("moi"))];
   const seriesDD = [serie("Moi", drawdown(moi).map(x => 100 * x), couleur("moi"))];
   for (const b of BASELINES) {
-    const v = journal.map(j => j.baselines[b]);
+    const v = interpoler(journal.map(j => j.tick), journal.map(j => j.baselines ? j.baselines[b] : null));
     series.push(serie(b.replace("_", " "), v, couleurTrader(b)));
     seriesDD.push(serie(b.replace("_", " "), drawdown(v).map(x => 100 * x), couleurTrader(b)));
   }
