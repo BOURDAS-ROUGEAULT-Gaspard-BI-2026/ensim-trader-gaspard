@@ -181,8 +181,10 @@
   <h2>Mon signal par produit</h2>
   <p class="sous-titre">
     z = (prix − moyenne) / écart-type. Si z &gt; 0,5 le prix est haut, je vends ; si z &lt; −0,5 il est bas, j'achète.
-    Fenêtre de 48 ticks pour A (cycle ~48), 96 pour B (un cycle complet), 12 pour C (cycle ~24).
+    Fenêtre de 48 ticks pour A (cycle ~48), 96 pour B (un cycle complet), 20 pour C (cycle ~24).
     Pour B, qui monte en tendance, je ne vends que près du pic (z &gt; 1) et je garde toujours au moins 400 unités.
+    Pour C, qui baisse en tendance, je vends tout dès que z &gt; 0 (100 unités par tick) pour être à 0 au pic,
+    et je rachète jusqu'à 1200 unités au creux (z &lt; −0,5).
   </p>
   <div class="periode" id="periode" role="group" aria-label="Période affichée">
     <button type="button" data-n="25">25 ticks</button>
@@ -239,10 +241,11 @@ const DECISION_URL = MON_REPO + "decision.json";
 const MOI = "gaspard";
 const BASELINES = ["random_trader", "random_buyer", "random_seller"];
 // memes parametres que dans algorithm.py
-const FENETRE = { A: 48, B: 96, C: 12 };
+const FENETRE = { A: 48, B: 96, C: 20 };
 const SEUIL = 0.5;
-const SEUIL_VENTE = { B: 1.0 };   // B : on attend d'etre pres du pic pour vendre
+const SEUIL_VENTE = { B: 1.0, C: 0 };   // B : on attend le pic ; C : on vend tout des que z > 0
 const PLANCHER = { B: 400 };      // B : unites qu'on garde toujours
+const STOCK_MAX = { C: 1200 };    // C : 0 unite en haut du cycle, 1200 au creux
 const seuilVente = p => SEUIL_VENTE[p] ?? SEUIL;
 let nbTicksAffiches = 100;   // 0 = tout l'historique, change avec les boutons
 const graphsSignaux = {};    // pour pouvoir detruire et redessiner les graphes A, B, C
@@ -290,6 +293,13 @@ function calculZ(prix, n, sv = SEUIL) {
 // meme regle que compute_signal dans algorithm.py
 function signal(z, p, unites) {
   if (z === null) return 0;
+  // C : on vise un stock (meme regle que compute_signal dans algorithm.py)
+  if (STOCK_MAX[p] !== undefined) {
+    if (unites === undefined) return z > seuilVente(p) ? -1 : z < -SEUIL ? 1 : 0;
+    if (z > seuilVente(p)) return -Math.min(1, unites / 100);
+    if (z < -SEUIL) return Math.max(0, Math.min(1, (STOCK_MAX[p] - unites) / 100));
+    return 0;
+  }
   if (z > 0 && z < seuilVente(p)) return 0;
   if (z <= 0 && z > -SEUIL) return 0;
   let s = Math.max(-1, Math.min(1, -z));

@@ -38,10 +38,25 @@ def fetch_json(url):
 # backtest sur l'historique (budget 3000 pour B seul) : meilleur que "ne rien faire" a
 # chaque pic et chaque creux depuis le tick 192 ; resultats proches pour une fenetre
 # de 80 a 96, moins bons au dela de 104
-fenetre = {"A": 48, "B": 96, "C": 12}
+#
+# C (change au tick 375) : sinus qui baisse (pic 3.58 au tick 19, 1.48 au tick 353)
+# mais qui prend environ +50 % du creux au pic. Les unites gardees d'un pic au suivant
+# perdent de la valeur, donc on veut 0 unite au pic et le maximum au creux.
+# On ne peut echanger que 100 unites par tick et une montee dure ~12 ticks, donc on
+# vise un stock max de 1200 qu'on peut vider pendant la montee :
+# - z > 0 (partie haute du cycle) : on vend tout ce qu'on a, 100 par tick
+#   backtest sur la verification selon le seuil de vente : z > 0 -> +2400,
+#   z > 0.25 -> +2200, z > 0.5 -> +2085. Plus on attend, plus on arrive au pic avec
+#   des unites en main, donc on vend des que z > 0
+# - z < -0.5 (pres du creux) : on rachete jusqu'a 1200 unites
+# backtest (regle sur 100-250, verifie sur 250-374) : +2400 contre +2160 pour l'ancienne
+# regle sur la verification ; resultats proches pour une fenetre de 16 a 20 et un
+# stock max de 1000 a 1500
+fenetre = {"A": 48, "B": 96, "C": 20}
 seuil = 0.5   # si le prix est trop proche de la moyenne on ne fait rien (bruit)
-seuil_vente = {"B": 1.0}   # pour B on attend d'etre pres du pic avant de vendre
+seuil_vente = {"B": 1.0, "C": 0.0}   # B : on attend d'etre pres du pic ; C : voir plus haut
 plancher = {"B": 400}      # unites de B qu'on garde toujours (on ne vend pas en dessous)
+stock_max = {"C": 1200}    # C : on vend tout si z > 0, on remonte jusqu'a ce stock au creux
 
 
 def calcul_z(prices, product):
@@ -65,6 +80,15 @@ def compute_signal(prices, product=None, unites=None):
     z = calcul_z(prices, product)
     if z is None:
         return 0.0
+
+    # C : on vise un stock (0 en haut du cycle, stock_max au creux), 100 unites max par tick
+    if product in stock_max and unites is not None:
+        if z > seuil_vente.get(product, seuil):
+            return round(-min(1.0, unites / 100), 3) + 0.0
+        if z < -seuil:
+            return round(max(0.0, min(1.0, (stock_max[product] - unites) / 100)), 3)
+        return 0.0
+
     if z > 0 and z < seuil_vente.get(product, seuil):
         return 0.0   # pas encore assez haut pour vendre
     if z <= 0 and z > -seuil:
@@ -126,6 +150,19 @@ def raison(p, z, d):
         return f"{p} : pas de cycle, on ne trade pas"
     if z is None:
         return f"{p} : pas assez d'historique"
+    if p in stock_max:
+        sv = seuil_vente.get(p, seuil)
+        if z > sv and d < 0:
+            return f"{p} : z={z:+.2f} haut du cycle, on vend tout avant le pic ({-d})"
+        if z > sv:
+            return f"{p} : z={z:+.2f} haut du cycle, plus rien a vendre, on attend le creux"
+        if z > 0:
+            return f"{p} : z={z:+.2f} ca monte, on attend z > {sv} pour vendre"
+        if z < -seuil and d > 0:
+            return f"{p} : z={z:+.2f} creux, on remonte vers {stock_max[p]} unites, achat {d}"
+        if z < -seuil:
+            return f"{p} : z={z:+.2f} creux mais deja au stock max (ou plus d'argent)"
+        return f"{p} : z={z:+.2f} ca redescend, on attend le creux pour racheter"
     if d == 0 and abs(z) < seuil:
         return f"{p} : z={z:+.2f} proche de la moyenne, on attend"
     if d == 0 and 0 < z < seuil_vente.get(p, seuil):
