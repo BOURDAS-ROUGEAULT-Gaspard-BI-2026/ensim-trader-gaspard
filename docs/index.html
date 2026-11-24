@@ -181,7 +181,8 @@
   <h2>Mon signal par produit</h2>
   <p class="sous-titre">
     z = (prix − moyenne) / écart-type. Si z &gt; 0,5 le prix est haut, je vends ; si z &lt; −0,5 il est bas, j'achète.
-    Fenêtre de 48 ticks pour A (cycle ~48), 50 pour B (cycle ~96), 12 pour C (cycle ~24).
+    Fenêtre de 48 ticks pour A (cycle ~48), 96 pour B (un cycle complet), 12 pour C (cycle ~24).
+    Pour B, qui monte en tendance, je ne vends que près du pic (z &gt; 1) et je garde toujours au moins 400 unités.
   </p>
   <div class="periode" id="periode" role="group" aria-label="Période affichée">
     <button type="button" data-n="25">25 ticks</button>
@@ -199,7 +200,7 @@
       <h3 id="h-B">Produit B</h3>
       <div class="graph"><canvas id="g-prix-B"></canvas></div>
       <div class="graph petit"><canvas id="g-z-B"></canvas></div>
-      <p class="note">Cycle long (~96 ticks), seulement 3-4 cycles observés : signal le moins sûr des trois.</p>
+      <p class="note">Cycle long (~96 ticks) avec une tendance qui monte : vente seulement au-dessus de z = 1, jamais sous 400 unités, pour garder une partie qui profite de la hausse.</p>
     </div>
     <div class="carte">
       <h3 id="h-C">Produit C</h3>
@@ -238,8 +239,11 @@ const DECISION_URL = MON_REPO + "decision.json";
 const MOI = "gaspard";
 const BASELINES = ["random_trader", "random_buyer", "random_seller"];
 // memes parametres que dans algorithm.py
-const FENETRE = { A: 48, B: 50, C: 12 };
+const FENETRE = { A: 48, B: 96, C: 12 };
 const SEUIL = 0.5;
+const SEUIL_VENTE = { B: 1.0 };   // B : on attend d'etre pres du pic pour vendre
+const PLANCHER = { B: 400 };      // B : unites qu'on garde toujours
+const seuilVente = p => SEUIL_VENTE[p] ?? SEUIL;
 let nbTicksAffiches = 100;   // 0 = tout l'historique, change avec les boutons
 const graphsSignaux = {};    // pour pouvoir detruire et redessiner les graphes A, B, C
 
@@ -270,23 +274,29 @@ async function charger(url) {
 }
 
 // moyenne, ecart-type et z pour chaque tick (null tant qu'il n'y a pas assez de prix)
-function calculZ(prix, n) {
+function calculZ(prix, n, sv = SEUIL) {
   const moy = [], haut = [], bas = [], z = [];
   for (let i = 0; i < prix.length; i++) {
     if (i + 1 < n) { moy.push(null); haut.push(null); bas.push(null); z.push(null); continue; }
     const derniers = prix.slice(i + 1 - n, i + 1);
     const m = derniers.reduce((a, b) => a + b, 0) / n;
     const sd = Math.sqrt(derniers.reduce((a, b) => a + (b - m) ** 2, 0) / n);
-    moy.push(m); haut.push(m + SEUIL * sd); bas.push(m - SEUIL * sd);
+    moy.push(m); haut.push(m + sv * sd); bas.push(m - SEUIL * sd);
     z.push(sd === 0 ? null : (prix[i] - m) / sd);
   }
   return { moy, haut, bas, z };
 }
 
 // meme regle que compute_signal dans algorithm.py
-function signal(z) {
-  if (z === null || Math.abs(z) < SEUIL) return 0;
-  return Math.max(-1, Math.min(1, -z));
+function signal(z, p, unites) {
+  if (z === null) return 0;
+  if (z > 0 && z < seuilVente(p)) return 0;
+  if (z <= 0 && z > -SEUIL) return 0;
+  let s = Math.max(-1, Math.min(1, -z));
+  if (s < 0 && PLANCHER[p] !== undefined && unites !== undefined) {
+    s = Math.max(s, -Math.max(0, unites - PLANCHER[p]) / 100);
+  }
+  return s;
 }
 
 // drawdown : de combien on est en dessous du plus haut atteint jusque la
@@ -314,7 +324,7 @@ function simuler(history, produits, avecStrategie) {
     if (avecStrategie && t + 1 < history.length) {
       for (const p of produits) {
         if (!FENETRE[p]) continue;
-        let s = signal(z[p][t]);
+        let s = signal(z[p][t], p, unites[p]);
         // garde-fou budget comme apply_budget_guard
         if (s > 0) {
           if (money <= 50) s = 0;
@@ -543,22 +553,23 @@ function dessinerSignaux(market, decision) {
     let titre = "Produit " + p + " : prix " + prix[prix.length - 1].toFixed(2);
 
     if (FENETRE[p]) {
-      const c = calculZ(prix, FENETRE[p]);
+      const sv = seuilVente(p);
+      const c = calculZ(prix, FENETRE[p], sv);
       const fin = arr => arr.slice(debut);
       datasets.push(serie("Moyenne", fin(c.moy), couleur("texte-2"), { borderDash: [5, 4], borderWidth: 1.5 }));
-      datasets.push(serie("Moyenne + 0,5 σ", fin(c.haut), couleur("texte-3"), { borderWidth: 1 }));
+      datasets.push(serie("Moyenne + " + String(sv).replace(".", ",") + " σ", fin(c.haut), couleur("texte-3"), { borderWidth: 1 }));
       datasets.push(serie("Moyenne − 0,5 σ", fin(c.bas), couleur("texte-3"), { borderWidth: 1 }));
 
       const zs = fin(c.z);
       const ligne = v => zs.map(() => v);
       graphsSignaux["g-z-" + p] = graphLigne("g-z-" + p, labels, [
         serie("z", zs, couleur("moi")),
-        serie("seuil vente", ligne(SEUIL), couleur("texte-3"), { borderDash: [4, 4], borderWidth: 1, pointHoverRadius: 0 }),
+        serie("seuil vente", ligne(sv), couleur("texte-3"), { borderDash: [4, 4], borderWidth: 1, pointHoverRadius: 0 }),
         serie("seuil achat", ligne(-SEUIL), couleur("texte-3"), { borderDash: [4, 4], borderWidth: 1, pointHoverRadius: 0 }),
       ], { ticks: { maxTicksLimit: 4 } });
 
       const zNow = c.z[c.z.length - 1];
-      const d = decision ? decision[p] : signal(zNow);
+      const d = decision ? decision[p] : signal(zNow, p);
       const action = d > 0 ? "achat " + d : d < 0 ? "vente " + (-d) : "on attend";
       titre += " · z = " + zNow.toFixed(2) + " · " + action;
     } else {

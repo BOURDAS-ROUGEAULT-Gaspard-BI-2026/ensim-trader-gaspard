@@ -26,10 +26,22 @@ def fetch_json(url):
 # prix au dessus de la moyenne -> il va redescendre -> on vend
 # prix en dessous de la moyenne -> il va remonter -> on achete
 # fenetres choisies en testant sur les ticks 0-200, verifiees sur 200-343
-# pour B la fenetre fait environ un demi-cycle (comme pour C), c'est le moins sur des 3
-# car on n'a vu que 3-4 cycles de B
-fenetre = {"A": 48, "B": 50, "C": 12}
+#
+# B (change au tick 375) : avec une fenetre de 50 (un demi-cycle) la moyenne suivait
+# le cycle lui-meme, z passait au dessus de 0.5 des le milieu de la montee et on a
+# tout vendu (0 unite de B des le tick 368) alors que B continuait a monter.
+# Maintenant :
+# - fenetre de 96 = un cycle complet : la moyenne lisse le cycle et ne garde que la
+#   tendance qui monte, donc z dit vraiment ou on en est dans le cycle
+# - on ne vend que pres du pic (z > 1) et jamais en dessous d'un plancher de 400 unites :
+#   on vend environ 60 % du stock au pic et on garde le reste qui profite de la tendance
+# backtest sur l'historique (budget 3000 pour B seul) : meilleur que "ne rien faire" a
+# chaque pic et chaque creux depuis le tick 192 ; resultats proches pour une fenetre
+# de 80 a 96, moins bons au dela de 104
+fenetre = {"A": 48, "B": 96, "C": 12}
 seuil = 0.5   # si le prix est trop proche de la moyenne on ne fait rien (bruit)
+seuil_vente = {"B": 1.0}   # pour B on attend d'etre pres du pic avant de vendre
+plancher = {"B": 400}      # unites de B qu'on garde toujours (on ne vend pas en dessous)
 
 
 def calcul_z(prices, product):
@@ -48,13 +60,24 @@ def calcul_z(prices, product):
     return (prices[-1] - moyenne) / ecart_type
 
 
-def compute_signal(prices, product=None):
+def compute_signal(prices, product=None, unites=None):
+    # unites = ce que je possede deja de ce produit (pour respecter le plancher)
     z = calcul_z(prices, product)
-    if z is None or abs(z) < seuil:
+    if z is None:
         return 0.0
+    if z > 0 and z < seuil_vente.get(product, seuil):
+        return 0.0   # pas encore assez haut pour vendre
+    if z <= 0 and z > -seuil:
+        return 0.0   # pas assez bas pour acheter
 
     # on fait l'inverse de z, et on reste entre -1 et 1
-    return max(-1.0, min(1.0, -z))
+    s = max(-1.0, min(1.0, -z))
+
+    # vente : on ne descend jamais sous le plancher (on garde une partie du stock)
+    if s < 0 and product in plancher and unites is not None:
+        a_vendre = max(0.0, unites - plancher[product])
+        s = max(s, -a_vendre / 100)
+    return round(s, 3) + 0.0   # + 0.0 transforme -0.0 en 0.0
 
 
 def apply_budget_guard(raw_signal, money, price, reserve=MIN_MONEY_RESERVE):
@@ -80,7 +103,7 @@ def main():
     decision = {}
     for p in products:
         prices = [row[p] for row in history]
-        raw = compute_signal(prices, p)
+        raw = compute_signal(prices, p, holdings["products"].get(p, 0))
         current_price = prices[-1] if prices else 0
         decision[p] = round(apply_budget_guard(raw, holdings["money"], current_price), 3)
 
@@ -105,6 +128,10 @@ def raison(p, z, d):
         return f"{p} : pas assez d'historique"
     if d == 0 and abs(z) < seuil:
         return f"{p} : z={z:+.2f} proche de la moyenne, on attend"
+    if d == 0 and 0 < z < seuil_vente.get(p, seuil):
+        return f"{p} : z={z:+.2f} ca monte encore, on attend le pic pour vendre"
+    if d == 0 and z > 0:
+        return f"{p} : z={z:+.2f} prix haut mais on garde le plancher de {plancher.get(p, 0)}"
     if d == 0:
         return f"{p} : z={z:+.2f} mais plus d'argent pour acheter"
     if d > 0:
