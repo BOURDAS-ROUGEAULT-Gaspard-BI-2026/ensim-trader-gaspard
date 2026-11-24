@@ -648,6 +648,41 @@
   }
  },
  {
+  "tick": 361,
+  "date": "2026-11-20T17:22:22Z",
+  "prix": {
+   "A": 5.0505,
+   "B": 11.2614,
+   "C": 1.222
+  },
+  "z": {
+   "A": 0.184,
+   "B": 0.21,
+   "C": -0.193
+  },
+  "decision": {
+   "A": 0.0,
+   "B": -1.0,
+   "C": 1.0
+  },
+  "raison": [
+   "tick non vu par le script : la d\u00e9cision pr\u00e9c\u00e9dente a \u00e9t\u00e9 r\u00e9appliqu\u00e9e (ligne simul\u00e9e)"
+  ],
+  "argent": 11951.16,
+  "produits": {
+   "A": 0.0,
+   "B": 603.2,
+   "C": 595.0
+  },
+  "valeur": 19471.13,
+  "baselines": {
+   "random_trader": null,
+   "random_buyer": null,
+   "random_seller": null
+  },
+  "simule": true
+ },
+ {
   "tick": 362,
   "date": "2026-11-20T22:56:07Z",
   "prix": {
@@ -1042,6 +1077,111 @@
    "random_buyer": 18616.83,
    "random_seller": 18005.8
   }
+ },
+ {
+  "tick": 373,
+  "date": "2026-11-24T06:39:28Z",
+  "prix": {
+   "A": 4.2612,
+   "B": 12.5796,
+   "C": 1.0823
+  },
+  "z": {
+   "A": -1.443,
+   "B": 2.141,
+   "C": -0.33
+  },
+  "decision": {
+   "A": 1.0,
+   "B": -1.0,
+   "C": 0.0
+  },
+  "raison": [
+   "tick non vu par le script : la d\u00e9cision pr\u00e9c\u00e9dente a \u00e9t\u00e9 r\u00e9appliqu\u00e9e (ligne simul\u00e9e)"
+  ],
+  "argent": 14701.6,
+  "produits": {
+   "A": 766.0,
+   "B": 0.0,
+   "C": 1553.0
+  },
+  "valeur": 19646.49,
+  "baselines": {
+   "random_trader": null,
+   "random_buyer": null,
+   "random_seller": null
+  },
+  "simule": true
+ },
+ {
+  "tick": 374,
+  "date": "2026-11-24T13:09:38Z",
+  "prix": {
+   "A": 4.3505,
+   "B": 12.5995,
+   "C": 1.1521
+  },
+  "z": {
+   "A": -1.265,
+   "B": 2.103,
+   "C": 0.087
+  },
+  "decision": {
+   "A": 1.0,
+   "B": -1.0,
+   "C": 0.0
+  },
+  "raison": [
+   "tick non vu par le script : la d\u00e9cision pr\u00e9c\u00e9dente a \u00e9t\u00e9 r\u00e9appliqu\u00e9e (ligne simul\u00e9e)"
+  ],
+  "argent": 14266.55,
+  "produits": {
+   "A": 866.0,
+   "B": 0.0,
+   "C": 1553.0
+  },
+  "valeur": 19823.29,
+  "baselines": {
+   "random_trader": null,
+   "random_buyer": null,
+   "random_seller": null
+  },
+  "simule": true
+ },
+ {
+  "tick": 375,
+  "date": "2026-11-24T13:12:20Z",
+  "prix": {
+   "A": 4.4184,
+   "B": 12.5047,
+   "C": 1.2063
+  },
+  "z": {
+   "A": -1.134,
+   "B": 1.897,
+   "C": 0.469
+  },
+  "decision": {
+   "A": 1.0,
+   "B": -1.0,
+   "C": 0.0
+  },
+  "raison": [
+   "tick non vu par le script : la d\u00e9cision pr\u00e9c\u00e9dente a \u00e9t\u00e9 r\u00e9appliqu\u00e9e (ligne simul\u00e9e)"
+  ],
+  "argent": 13824.71,
+  "produits": {
+   "A": 966.0,
+   "B": 0.0,
+   "C": 1553.0
+  },
+  "valeur": 19966.27,
+  "baselines": {
+   "random_trader": null,
+   "random_buyer": null,
+   "random_seller": null
+  },
+  "simule": true
  },
  {
   "tick": 376,
