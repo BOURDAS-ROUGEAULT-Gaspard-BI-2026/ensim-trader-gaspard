@@ -38,6 +38,10 @@ def fetch_json(url):
 # backtest sur l'historique (budget 3000 pour B seul) : meilleur que "ne rien faire" a
 # chaque pic et chaque creux depuis le tick 192 ; resultats proches pour une fenetre
 # de 80 a 96, moins bons au dela de 104
+# - achat : des que z < -0.5 on achete 100 unites d'un coup (avant : 100 * -z, donc
+#   seulement 60 unites a z = -0.6, on rachetait trop peu au creux)
+#   backtest ticks 100-374 (budget 3000 pour B) : +4769 contre +3514 avant ;
+#   seuils de -0.5 a 0 proches, au dela de 0 on rachete trop tot dans la descente
 #
 # C (change au tick 375) : sinus qui baisse (pic 3.58 au tick 19, 1.48 au tick 353)
 # mais qui prend environ +50 % du creux au pic. Les unites gardees d'un pic au suivant
@@ -56,6 +60,7 @@ fenetre = {"A": 48, "B": 96, "C": 20}
 seuil = 0.5   # si le prix est trop proche de la moyenne on ne fait rien (bruit)
 seuil_vente = {"B": 1.0, "C": 0.0}   # B : on attend d'etre pres du pic ; C : voir plus haut
 plancher = {"B": 400}      # unites de B qu'on garde toujours (on ne vend pas en dessous)
+achat_plein = {"B"}        # B : achat de 100 unites des que z < -0.5 (pas dose par z)
 stock_max = {"C": 1200}    # C : on vend tout si z > 0, on remonte jusqu'a ce stock au creux
 
 
@@ -96,6 +101,8 @@ def compute_signal(prices, product=None, unites=None):
 
     # on fait l'inverse de z, et on reste entre -1 et 1
     s = max(-1.0, min(1.0, -z))
+    if s > 0 and product in achat_plein:
+        s = 1.0   # achat franc de 100 unites (le garde-fou budget peut encore le reduire)
 
     # vente : on ne descend jamais sous le plancher (on garde une partie du stock)
     if s < 0 and product in plancher and unites is not None:
