@@ -176,6 +176,63 @@ def raison(p, z, d):
     return f"{p} : z={z:+.2f} prix haut, on vend {-d}"
 
 
+def combler_trous(journal, market):
+    # Le workflow GitHub ne tourne pas toujours a l'heure et le marche peut avancer
+    # de plusieurs ticks d'un coup : certains ticks ne sont jamais vus par le script.
+    # Pendant ces ticks, le marche a reutilise notre dernier decision.json, donc on
+    # rejoue cette meme decision tick par tick (execution au prix du tick, achat
+    # limite par l'argent, vente limitee par les unites) pour reconstruire les lignes.
+    # Verifie sur les trous 360->362 et 372->376 : on retombe sur l'argent et les
+    # unites reels de la ligne suivante (a 1 centime pres).
+    # Les lignes ajoutees ont "simule": true. Renvoie le nombre de lignes ajoutees.
+    par_tick = {row["t"]: row for row in market["history"]}
+    produits = market["products"]
+    ajoutees = 0
+    i = 0
+    while i < len(journal) - 1:
+        avant, apres = journal[i], journal[i + 1]
+        if apres["tick"] - avant["tick"] <= 1:
+            i += 1
+            continue
+        argent = avant["argent"]
+        unites = {p: avant["produits"].get(p, 0) for p in produits}
+        nouvelles = []
+        for t in range(avant["tick"] + 1, apres["tick"]):
+            if t not in par_tick:
+                break   # prix inconnu, on ne peut pas simuler plus loin
+            prix = {p: par_tick[t][p] for p in produits}
+            # la decision en cours (celle de la ligne d'avant) s'execute a ce tick
+            for p in produits:
+                q = 100 * avant["decision"].get(p, 0)
+                q = min(q, argent / prix[p]) if q > 0 else max(q, -unites[p])
+                argent -= q * prix[p]
+                unites[p] += q
+            history = [row for row in market["history"] if row["t"] <= t]
+            z = {}
+            for p in produits:
+                zp = calcul_z([row[p] for row in history], p)
+                z[p] = None if zp is None else round(zp, 3)
+            nouvelles.append({
+                "tick": t,
+                "date": par_tick[t].get("timestamp"),
+                "prix": prix,
+                "z": z,
+                "decision": dict(avant["decision"]),   # pas de nouveau decision.json
+                "raison": ["tick non vu par le script : la décision précédente a été réappliquée (ligne simulée)"],
+                "argent": round(argent, 2),
+                "produits": {p: round(q, 2) for p, q in unites.items()},
+                "valeur": round(argent + sum(unites[p] * prix[p] for p in produits), 2),
+                "baselines": {b: None for b in ["random_trader", "random_buyer", "random_seller"]},
+                "simule": True,
+            })
+        journal[i + 1:i + 1] = nouvelles
+        ajoutees += len(nouvelles)
+        i += len(nouvelles) + 1
+    if ajoutees:
+        print(f"journal : {ajoutees} tick(s) manquant(s) simule(s)")
+    return ajoutees
+
+
 def ajouter_au_journal(market, holdings, decision):
     history = market["history"]
     tick = history[-1]["t"]
@@ -189,8 +246,13 @@ def ajouter_au_journal(market, holdings, decision):
 
     # le marche avance toutes les heures mais le script tourne toutes les 30 min,
     # donc on n'ajoute une ligne que quand il y a un nouveau tick
+    # (on comble quand meme les trous au cas ou il en reste d'un ancien passage)
     if journal and journal[-1]["tick"] == tick:
-        print("journal : meme tick, rien a ajouter")
+        if combler_trous(journal, market) > 0:
+            with open(JOURNAL, "w") as f:
+                json.dump(journal, f, indent=1)
+        else:
+            print("journal : meme tick, rien a ajouter")
         return
 
     # valeur des autres traders (dont les 3 baselines) donnee par le classement du prof
@@ -216,6 +278,7 @@ def ajouter_au_journal(market, holdings, decision):
         "valeur": round(valeur, 2),
         "baselines": {b: autres.get(b) for b in ["random_trader", "random_buyer", "random_seller"]},
     })
+    combler_trous(journal, market)
     with open(JOURNAL, "w") as f:
         json.dump(journal, f, indent=1)
     print(f"journal : tick {tick} ajoute ({len(journal)} lignes)")
