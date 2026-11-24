@@ -20,6 +20,9 @@
     --random-buyer: #1baf7a;   /* vert d'eau */
     --random-seller: #eda100;  /* jaune */
     --autres: #b5b4ae;         /* les autres eleves en gris */
+    --prod-A: #7c5cd6;         /* couleurs des produits (section portefeuille) */
+    --prod-B: #13919e;
+    --prod-C: #c94a85;
     --bon: #008300;
     --mauvais: #d03b3b;
   }
@@ -29,6 +32,7 @@
       --texte: #f0efec; --texte-2: #c3c2b7; --texte-3: #8d8c85; --grille: #2a2a28;
       --moi: #3987e5; --random-trader: #d95926; --random-buyer: #199e70; --random-seller: #c98500;
       --autres: #5c5b56; --bon: #3fb93f; --mauvais: #e66767;
+      --prod-A: #9b80ec; --prod-B: #2fb3c0; --prod-C: #e06ba1;
     }
   }
   :root[data-theme="dark"] {
@@ -36,6 +40,7 @@
     --texte: #f0efec; --texte-2: #c3c2b7; --texte-3: #8d8c85; --grille: #2a2a28;
     --moi: #3987e5; --random-trader: #d95926; --random-buyer: #199e70; --random-seller: #c98500;
     --autres: #5c5b56; --bon: #3fb93f; --mauvais: #e66767;
+    --prod-A: #9b80ec; --prod-B: #2fb3c0; --prod-C: #e06ba1;
   }
 
   * { box-sizing: border-box; }
@@ -98,6 +103,24 @@
     <div class="tuile"><div class="label">Écart avec la meilleure baseline</div><div class="valeur" id="t-ecart">—</div><div class="detail" id="t-ecart-d"></div></div>
     <div class="tuile"><div class="label">Drawdown actuel</div><div class="valeur" id="t-dd">—</div><div class="detail">baisse depuis mon plus haut</div></div>
     <div class="tuile"><div class="label">Argent disponible</div><div class="valeur" id="t-argent">—</div><div class="detail">réserve minimum : 50</div></div>
+  </div>
+
+  <!-- PORTEFEUILLE -->
+  <h2>Mon portefeuille</h2>
+  <p class="sous-titre">Combien d'unités de chaque produit je possède, et comment ça a bougé avec mes ordres.</p>
+  <div class="tuiles" id="tuiles-produits"></div>
+  <div class="grille2" style="margin-top:12px">
+    <div class="carte">
+      <h3>Unités détenues au fil des ticks</h3>
+      <div class="legende" id="legende-produits"></div>
+      <div class="graph"><canvas id="g-unites"></canvas></div>
+      <p class="vide" id="v-unites"></p>
+    </div>
+    <div class="carte">
+      <h3>Argent disponible au fil des ticks</h3>
+      <div class="graph"><canvas id="g-argent"></canvas></div>
+      <p class="note">Le trait pointillé est la réserve minimum de 50 que l'algorithme ne dépense jamais.</p>
+    </div>
   </div>
 
   <!-- 2. PERFORMANCE -->
@@ -191,11 +214,14 @@
   <p class="sous-titre">Une ligne par tick, écrite automatiquement par <code>scripts/algorithm.py</code>.</p>
   <div class="carte table-wrap">
     <table>
-      <thead><tr><th>Tick</th><th>Date</th><th>A</th><th>B</th><th>C</th><th>Valeur</th><th>Raison</th></tr></thead>
+      <thead><tr><th>Tick</th><th>Date</th><th>A</th><th>B</th><th>C</th><th>Dépensé</th><th>Gagné</th><th>Net</th><th>Valeur</th><th>Raison</th></tr></thead>
       <tbody id="journal"></tbody>
     </table>
     <p class="vide" id="v-journal"></p>
   </div>
+  <p class="note">A, B, C = signal décidé (entre −1 et 1). Dépensé / Gagné = argent des achats / ventes réellement exécutés,
+    retrouvés avec la variation des unités entre ce tick et le suivant, au prix du tick suivant (survolez pour le détail).
+    Net = variation réelle de l'argent. La dernière ligne est encore en attente d'exécution.</p>
 
   <p class="note" style="margin-top:24px">Sources : flux du marché, mon portefeuille et le classement publiés par le prof, et mon journal <code>docs/data/journal.json</code>. <a href="check.html">Test des flux</a></p>
 </main>
@@ -350,13 +376,14 @@ function dessinerResume(market, holdings, classement, journal) {
   ecrire("t-valeur-d", "départ : 1000 + 1000 de chaque produit");
 
   // rendement reel : valeur actuelle comparee au portefeuille de depart
-  // (1000 d'argent + 1000 unites de chaque produit, aux prix du premier tick du marche)
-  const premier = market.history[0];
-  const depart = 1000 + market.products.reduce((a, p) => a + 1000 * premier[p], 0);
+  // (1000 d'argent + 1000 unites de chaque produit, aux prix de mon premier tick = 1re ligne du journal)
+  const prixDepart = journal.length > 0 ? journal[0].prix : market.history[0];
+  const depart = 1000 + market.products.reduce((a, p) => a + 1000 * prixDepart[p], 0);
   const rien = 1000 + market.products.reduce((a, p) => a + 1000 * dernier[p], 0);
   const rendement = valeur / depart - 1;
   ecrire("t-rendement", pct(rendement), rendement >= 0 ? "pos" : "neg");
-  ecrire("t-rendement-d", "ne rien faire : " + pct(rien / depart - 1) + " · départ " + argent(depart));
+  ecrire("t-rendement-d", "ne rien faire : " + pct(rien / depart - 1)
+    + (journal.length > 0 ? " · depuis le tick " + journal[0].tick : ""));
 
   const tri = [...classement.leaderboard].sort((a, b) => b.total_value - a.total_value);
   const rang = tri.findIndex(r => r.id === MOI) + 1;
@@ -375,6 +402,55 @@ function dessinerResume(market, holdings, classement, journal) {
     const ddActuel = dd[dd.length - 1];
     ecrire("t-dd", pct(ddActuel, false), ddActuel < -0.05 ? "neg" : "");
   }
+}
+
+function dessinerPortefeuille(market, holdings, journal) {
+  const dernier = market.history[market.history.length - 1];
+
+  // une tuile par produit : unites actuelles (holdings du prof) + variation depuis le depart
+  const tuiles = document.getElementById("tuiles-produits");
+  for (const p of market.products) {
+    const u = holdings.products[p];
+    const diff = u - 1000;
+    const t = document.createElement("div");
+    t.className = "tuile";
+    t.innerHTML = '<div class="label"></div><div class="valeur"></div><div class="detail"></div>';
+    t.querySelector(".label").textContent = "Produit " + p + " (unités)";
+    t.querySelector(".valeur").textContent = argent(u);
+    t.querySelector(".valeur").style.color = couleur("prod-" + p);
+    t.querySelector(".detail").textContent = "vaut " + argent(u * dernier[p])
+      + " · " + (diff > 0 ? "+" : "") + argent(diff) + " depuis le départ";
+    tuiles.appendChild(t);
+  }
+
+  // legende HTML des produits
+  const legende = document.getElementById("legende-produits");
+  for (const p of market.products) {
+    const s = document.createElement("span");
+    s.style.setProperty("--c", couleur("prod-" + p));
+    s.textContent = "Produit " + p;
+    legende.appendChild(s);
+  }
+
+  // historique depuis le journal ; on ajoute le dernier etat connu (holdings) s'il est plus recent
+  const lignes = journal.map(j => ({ tick: j.tick, argent: j.argent, produits: j.produits }));
+  if (lignes.length === 0 || lignes[lignes.length - 1].tick < dernier.t) {
+    lignes.push({ tick: dernier.t, argent: holdings.money, produits: holdings.products });
+  }
+  const labels = lignes.map(l => "tick " + l.tick);
+  const marches = { stepped: true, tension: 0 };   // en escalier : les unites changent d'un coup
+  const series = market.products.map(p =>
+    serie("Produit " + p, lignes.map(l => l.produits[p]), couleur("prod-" + p), marches));
+  if (lignes.length < 2) series.forEach(s => s.pointRadius = 4);
+  graphLigne("g-unites", labels, series, { ticks: { callback: v => argent(v), maxTicksLimit: 5 } });
+  if (lignes.length < 2) ecrire("v-unites", "Un seul point pour l'instant : la courbe se remplit à chaque tick.");
+
+  const serieArgent = serie("Argent", lignes.map(l => l.argent), couleur("moi"), marches);
+  if (lignes.length < 2) serieArgent.pointRadius = 4;
+  graphLigne("g-argent", labels, [
+    serieArgent,
+    serie("Réserve minimum", lignes.map(() => 50), couleur("texte-3"), { borderDash: [4, 4], borderWidth: 1, pointHoverRadius: 0 }),
+  ], { beginAtZero: true, ticks: { callback: v => argent(v), maxTicksLimit: 5 } });
 }
 
 function dessinerClassement(classement) {
@@ -500,18 +576,46 @@ function dessinerJournal(journal) {
     return;
   }
   const fmt = d => d > 0 ? "+" + d : String(d);
-  for (const j of [...journal].reverse()) {
+  const deux = x => x.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // trade execute pour la decision de la ligne i : on le voit dans la ligne i+1
+  // (variation des unites, au prix du tick i+1 ou l'ordre est execute)
+  function trade(i) {
+    const avant = journal[i], apres = journal[i + 1];
+    if (!apres) return null;   // derniere ligne : ordre pas encore execute
+    let depense = 0, gagne = 0;
+    const detail = [];
+    for (const p in apres.produits) {
+      const q = apres.produits[p] - avant.produits[p];
+      if (Math.abs(q) < 1e-9) continue;
+      const montant = Math.abs(q) * apres.prix[p];
+      if (q > 0) depense += montant; else gagne += montant;
+      detail.push(p + " : " + (q > 0 ? "achat " : "vente ") + argent(Math.abs(q)) + " × " + apres.prix[p].toFixed(2) + " = " + deux(montant));
+    }
+    return { depense, gagne, net: apres.argent - avant.argent, detail: detail.join("\n") || "aucun échange" };
+  }
+
+  for (let i = journal.length - 1; i >= 0; i--) {
+    const j = journal[i];
+    const t = trade(i);
     const tr = document.createElement("tr");
     const cellules = [
       j.tick, new Date(j.date).toLocaleString("fr-FR"),
       fmt(j.decision.A), fmt(j.decision.B), fmt(j.decision.C),
+      t ? (t.depense > 0 ? "−" + deux(t.depense) : "—") : "en attente",
+      t ? (t.gagne > 0 ? "+" + deux(t.gagne) : "—") : "",
+      t ? (t.net > 0 ? "+" : t.net < 0 ? "−" : "") + deux(Math.abs(t.net)) : "",
       argent(j.valeur), j.raison.join(" · "),
     ];
-    cellules.forEach((c, i) => {
+    cellules.forEach((c, k) => {
       const td = document.createElement("td");
       td.textContent = c;
-      if ([0, 2, 3, 4, 5].includes(i)) td.className = "num";
-      if (i === 6) td.className = "raison";
+      if ([0, 2, 3, 4, 5, 6, 7, 8].includes(k)) td.className = "num";
+      if (k === 5 && t && t.depense > 0) td.className += " neg";
+      if (k === 6 && t && t.gagne > 0) td.className += " pos";
+      if (k === 7 && t) td.className += t.net > 0 ? " pos" : t.net < 0 ? " neg" : "";
+      if (k >= 5 && k <= 7 && t) td.title = t.detail;
+      if (k === 9) td.className = "raison";
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
@@ -546,6 +650,7 @@ async function main() {
       + (decision ? " · ma dernière décision : " + new Date(decision.updated_at).toLocaleString("fr-FR") : ""));
 
     dessinerResume(market, holdings, classement, journal);
+    dessinerPortefeuille(market, holdings, journal);
     dessinerClassement(classement);
     dessinerPerformanceEtRisque(journal);
     dessinerSimulation(market, journal);
