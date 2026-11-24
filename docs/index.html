@@ -93,6 +93,7 @@
   <!-- 1. RESUME -->
   <div class="tuiles">
     <div class="tuile"><div class="label">Valeur totale</div><div class="valeur" id="t-valeur">—</div><div class="detail" id="t-valeur-d"></div></div>
+    <div class="tuile"><div class="label">Rendement actuel</div><div class="valeur" id="t-rendement">—</div><div class="detail" id="t-rendement-d"></div></div>
     <div class="tuile"><div class="label">Classement</div><div class="valeur" id="t-rang">—</div><div class="detail" id="t-rang-d"></div></div>
     <div class="tuile"><div class="label">Écart avec la meilleure baseline</div><div class="valeur" id="t-ecart">—</div><div class="detail" id="t-ecart-d"></div></div>
     <div class="tuile"><div class="label">Drawdown actuel</div><div class="valeur" id="t-dd">—</div><div class="detail">baisse depuis mon plus haut</div></div>
@@ -136,9 +137,10 @@
       <p class="vide" id="v-drawdown"></p>
     </div>
     <div class="carte">
-      <h3>Simulation de ma stratégie sur tout l'historique</h3>
+      <h3>Simulation de ma stratégie et résultat réel</h3>
       <div class="legende">
-        <span style="--c: var(--moi)">Ma stratégie (simulée)</span>
+        <span style="--c: var(--moi)">Réel (journal)</span>
+        <span style="--c: var(--texte-2)">Ma stratégie (simulée)</span>
         <span style="--c: var(--texte-3)">Ne rien faire</span>
       </div>
       <div class="graph"><canvas id="g-simu"></canvas></div>
@@ -347,6 +349,15 @@ function dessinerResume(market, holdings, classement, journal) {
   ecrire("t-valeur", argent(valeur));
   ecrire("t-valeur-d", "départ : 1000 + 1000 de chaque produit");
 
+  // rendement reel : valeur actuelle comparee au portefeuille de depart
+  // (1000 d'argent + 1000 unites de chaque produit, aux prix du premier tick du marche)
+  const premier = market.history[0];
+  const depart = 1000 + market.products.reduce((a, p) => a + 1000 * premier[p], 0);
+  const rien = 1000 + market.products.reduce((a, p) => a + 1000 * dernier[p], 0);
+  const rendement = valeur / depart - 1;
+  ecrire("t-rendement", pct(rendement), rendement >= 0 ? "pos" : "neg");
+  ecrire("t-rendement-d", "ne rien faire : " + pct(rien / depart - 1) + " · départ " + argent(depart));
+
   const tri = [...classement.leaderboard].sort((a, b) => b.total_value - a.total_value);
   const rang = tri.findIndex(r => r.id === MOI) + 1;
   ecrire("t-rang", rang + " / " + tri.length);
@@ -417,13 +428,22 @@ function dessinerPerformanceEtRisque(journal) {
   }
 }
 
-function dessinerSimulation(market) {
+function dessinerSimulation(market, journal) {
   const algo = simuler(market.history, market.products, true);
   const rien = simuler(market.history, market.products, false);
   const labels = market.history.map(r => "tick " + r.t);
+
+  // vraie valeur : on place chaque ligne du journal sur le tick du marche correspondant
+  const reelParTick = {};
+  journal.forEach(j => reelParTick[j.tick] = j.valeur);
+  const reel = market.history.map(r => r.t in reelParTick ? reelParTick[r.t] : null);
+  const serieReel = serie("Réel (journal)", reel, couleur("moi"), { borderWidth: 2.5 });
+  if (journal.length < 2) serieReel.pointRadius = 4;
+
   graphLigne("g-simu", labels, [
-    serie("Ma stratégie (simulée)", algo, couleur("moi")),
-    serie("Ne rien faire", rien, couleur("texte-3"), { borderDash: [5, 4] }),
+    serieReel,
+    serie("Ma stratégie (simulée)", algo, couleur("texte-2"), { borderWidth: 1.5 }),
+    serie("Ne rien faire", rien, couleur("texte-3"), { borderDash: [5, 4], borderWidth: 1.5 }),
   ], { ticks: { callback: v => argent(v), maxTicksLimit: 5 } });
 
   const r = v => v[v.length - 1] / v[0] - 1;
@@ -432,7 +452,8 @@ function dessinerSimulation(market) {
   ecrire("t-ddsimu", pct(Math.min(...drawdown(algo)), false));
   ecrire("t-ddsimu-d", "ne rien faire : " + pct(Math.min(...drawdown(rien)), false));
   ecrire("n-simu", "Backtest sur " + market.history.length + " ticks, ordre exécuté au prix du tick suivant, sans frais. "
-    + "Ce n'est pas mon vrai résultat, ça sert à vérifier que la règle tient sur l'historique.");
+    + "La courbe simulée sert à vérifier que la règle tient sur l'historique ; la courbe bleue est mon vrai résultat, "
+    + "présent seulement sur les ticks où le journal existe.");
 }
 
 function dessinerSignaux(market, decision) {
@@ -527,7 +548,7 @@ async function main() {
     dessinerResume(market, holdings, classement, journal);
     dessinerClassement(classement);
     dessinerPerformanceEtRisque(journal);
-    dessinerSimulation(market);
+    dessinerSimulation(market, journal);
     dessinerSignaux(market, decision);
     brancherPeriode(market, decision);
     dessinerJournal(journal);
