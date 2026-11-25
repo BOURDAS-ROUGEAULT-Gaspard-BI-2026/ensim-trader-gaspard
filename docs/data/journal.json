@@ -1325,5 +1325,41 @@
    "random_buyer": 19419.74,
    "random_seller": 18005.8
   }
+ },
+ {
+  "tick": 380,
+  "date": "2026-11-25T21:53:26Z",
+  "prix": {
+   "A": 4.5831,
+   "B": 12.4424,
+   "C": 1.3519
+  },
+  "z": {
+   "A": -0.833,
+   "B": 1.604,
+   "C": 1.516
+  },
+  "decision": {
+   "A": 0.833,
+   "B": 0.0,
+   "C": -1.0
+  },
+  "raison": [
+   "A : z=-0.83 prix bas, on achete 0.833",
+   "B : z=+1.60 prix haut mais on garde le plancher de 400",
+   "C : z=+1.52 haut du cycle, on vend tout avant le pic (1.0)"
+  ],
+  "argent": 12165.84,
+  "produits": {
+   "A": 1450.6,
+   "B": 0.0,
+   "C": 1153.0
+  },
+  "valeur": 20372.83,
+  "baselines": {
+   "random_trader": 18773.07,
+   "random_buyer": 19265.68,
+   "random_seller": 18005.8
+  }
  }
 ]
