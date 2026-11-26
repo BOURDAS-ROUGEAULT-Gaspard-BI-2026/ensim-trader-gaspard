@@ -1397,5 +1397,76 @@
    "random_buyer": 19402.35,
    "random_seller": 18005.8
   }
+ },
+ {
+  "tick": 382,
+  "date": "2026-11-26T13:02:04Z",
+  "prix": {
+   "A": 4.7511,
+   "B": 12.7918,
+   "C": 1.2841
+  },
+  "z": {
+   "A": -0.491,
+   "B": 2.009,
+   "C": 0.959
+  },
+  "decision": {
+   "A": 0.683,
+   "B": 0.0,
+   "C": -1.0
+  },
+  "raison": [
+   "tick non vu par le script : la d\u00e9cision pr\u00e9c\u00e9dente a \u00e9t\u00e9 r\u00e9appliqu\u00e9e (ligne simul\u00e9e)"
+  ],
+  "argent": 11715.14,
+  "produits": {
+   "A": 1602.2,
+   "B": 0.0,
+   "C": 953.0
+  },
+  "valeur": 20551.1,
+  "baselines": {
+   "random_trader": null,
+   "random_buyer": null,
+   "random_seller": null
+  },
+  "simule": true
+ },
+ {
+  "tick": 383,
+  "date": "2026-11-26T13:29:21Z",
+  "prix": {
+   "A": 4.8001,
+   "B": 12.5622,
+   "C": 1.2227
+  },
+  "z": {
+   "A": -0.389,
+   "B": 1.658,
+   "C": 0.548
+  },
+  "decision": {
+   "A": 0.0,
+   "B": 0.0,
+   "C": -1.0
+  },
+  "raison": [
+   "A : z=-0.39 proche de la moyenne, on attend",
+   "B : z=+1.66 prix haut mais on garde le plancher de 400",
+   "C : z=+0.55 haut du cycle, on vend tout avant le pic (1.0)"
+  ],
+  "argent": 11509.57,
+  "produits": {
+   "A": 1670.5,
+   "B": 0.0,
+   "C": 853.0
+  },
+  "valeur": 20571.1,
+  "baselines": {
+   "random_trader": 19140.74,
+   "random_buyer": 19490.57,
+   "random_seller": 18005.8
+  }
  }
 ]
