@@ -1504,5 +1504,76 @@
    "random_buyer": 19537.92,
    "random_seller": 18005.8
   }
+ },
+ {
+  "tick": 385,
+  "date": "2026-11-26T22:44:14Z",
+  "prix": {
+   "A": 5.1069,
+   "B": 12.703,
+   "C": 1.0977
+  },
+  "z": {
+   "A": 0.261,
+   "B": 1.779,
+   "C": -0.289
+  },
+  "decision": {
+   "A": 0.0,
+   "B": 0.0,
+   "C": -1.0
+  },
+  "raison": [
+   "tick non vu par le script : la d\u00e9cision pr\u00e9c\u00e9dente a \u00e9t\u00e9 r\u00e9appliqu\u00e9e (ligne simul\u00e9e)"
+  ],
+  "argent": 11736.47,
+  "produits": {
+   "A": 1670.5,
+   "B": 0.0,
+   "C": 653.0
+  },
+  "valeur": 20984.34,
+  "baselines": {
+   "random_trader": null,
+   "random_buyer": null,
+   "random_seller": null
+  },
+  "simule": true
+ },
+ {
+  "tick": 386,
+  "date": "2026-11-27T04:44:32Z",
+  "prix": {
+   "A": 5.1529,
+   "B": 12.497,
+   "C": 1.0263
+  },
+  "z": {
+   "A": 0.358,
+   "B": 1.48,
+   "C": -0.785
+  },
+  "decision": {
+   "A": 0.0,
+   "B": 0.0,
+   "C": 1.0
+  },
+  "raison": [
+   "A : z=+0.36 proche de la moyenne, on attend",
+   "B : z=+1.48 prix haut mais on garde le plancher de 400",
+   "C : z=-0.79 creux, on remonte vers 1200 unites, achat 1.0"
+  ],
+  "argent": 11839.1,
+  "produits": {
+   "A": 1670.5,
+   "B": 0.0,
+   "C": 553.0
+  },
+  "valeur": 21014.56,
+  "baselines": {
+   "random_trader": 19588.16,
+   "random_buyer": 19606.08,
+   "random_seller": 18005.8
+  }
  }
 ]
